@@ -21,18 +21,114 @@
     }
 
     /* Your style here... */
+    .captcha-stack {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .captcha-header {
+      padding: 0.5em 1em;
+      background-color: #388ae9;
+      color: white;
+    }
+
+    .captcha-title-important,
+    .captcha-subtitle {
+      display: block;
+      padding: 0;
+    }
+
+    .captcha-title-important {
+      font-size: xx-large;
+      font-weight: bold;
+    }
+
+    .captcha-subtitle {
+      font-size: small;
+      font-style: italic;
+    }
+
+    #slides {
+      display: flex;
+      flex-grow: 1;
+      width: fit-content;
+      min-height: 0;
+      transition: transform 0.5s ease-in-out;
+    }
+
+    .captcha-content {
+      width: 390px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+      min-height: 0;
+      padding: 0.5em;
+    }
+
+    #captcha-animation {
+      flex-grow: 1;
+      min-height: 0;
+      margin-bottom: 0.5em;
+      border-radius: 5px;
+      background-clip: padding-box;
+    }
+
+    .captcha-button {
+      display: block;
+      width: 100%;
+      background-color: #388ae9;
+      color: white;
+      font-size: large;
+      border-radius: 0.25em;
+      cursor: pointer;
+      padding: 0.25em;
+      border: none;
+    }
+
+    .captcha-instructions {
+      display: block;
+      width: 100%;
+    }
+
+    .captcha-heart,
+    #bpm-stat {
+      font-size: xx-large;
+      font-weight: bold;
+      text-align: center;
+      padding: 0.5em;
+    }
+
+    .captcha-info-title {
+      font-size: large;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .captcha-info-subtitle {
+      padding: 1em;
+      text-align: center;
+    }
   </style>
 </head>
 
 <body>
   <div id="captcha-container">
     <!-- Add your CAPTCHA here: -->
-    Hello world!
-
-    <!-- We've added a sample button. Feel free to remove it: -->
-    <button id="solve">
-      Solve!
-    </button>
+    <div class="captcha-stack">
+      <div class="captcha-header">
+        Hold your mouse
+        <span class="captcha-title-important">against your wrist</span>
+        <span class="captcha-subtitle">Measure your heart rate to confirm you are not a robot.</span>
+      </div>
+      <div id="slides">
+      </div>
+    </div>
   </div>
 
   <script type="text/javascript">
@@ -42,9 +138,175 @@
         window.top.postMessage("success", '*');
       }
 
-      // Your CAPTCHA code goes here, we've added a simple example below:
-      document.getElementById('solve')
-           .addEventListener('click', () => captchaSuccess());
+      // Changing this will affect the amount of mouse movement allowed before failing the captcha
+      const difficulty = 5;
+
+      //BEGIN JAVASCRIPT SPAGHETTI
+      const slides = {
+        start: `<div class="captcha-content" id="start">
+          <video id="captcha-animation" loop autoplay>
+            <source src="animation.mp4" type="video/mp4">
+          </video>
+          <button class="captcha-button" id="start-button">Next</button>
+        </div>`,
+        instructions: `<div class="captcha-content" id="instructions">
+          <div id="captcha-animation">
+            <strong>To confirm you're not a robot, please:</strong>
+            <ol>
+              <li>Raise your computer mouse</li>
+              <li>Hold it against your wrist</li>
+              <li>Wait 30 seconds while we measure your heart rate</li>
+            </ol>
+            <p>If you are using a laptop, please use your <strong>trackpad</strong> instead.</p>
+          </div>
+          <button class="captcha-button" id="next-button">Next</button>
+        </div>`,
+        detectingPulse: `<div class="captcha-content" id="detectingPulse">
+          <span class="captcha-info-title">⏳ Detecting pulse</span>
+          <span class="captcha-info-subtitle">Please hold your mouse against your wrist now.</span>
+        </div>`,
+        measuring: `<div class="captcha-content" id="detectingPulse">
+          <span class="captcha-heart">❤️</span>
+          <span id="bpm-stat">Starting in 5</span>
+          <span class="captcha-info-subtitle" id="bpm-info">Keep your mouse steady.</span>
+        </div>`,
+        keepStill: `<div class="captcha-content" id="detectingPulse">
+          <span class="captcha-info-title">❌ Measurement failed</span>
+          <span class="captcha-info-subtitle">Either your mouse moved too much, or we couldn't detect a pulse. Please keep your mouse steady and try again.</span>
+          <button class="captcha-button" id="retry-button">Retry</button>
+        </div>`
+      }
+
+      const slidesContainer = document.getElementById("slides");
+      let activeSlides = [];
+      let currentSlideInex = 0;
+
+      function addActiveSlide(slideName) {
+        activeSlides.push(slideName);
+        slidesContainer.innerHTML += slides[slideName];
+      }
+
+      function setSlide(slideIndex) {
+        slidesContainer.style.transform = `translateX(-${slideIndex * 390}px)`;
+      }
+
+      function goTo(slideName) {
+        if (!activeSlides.includes(slideName)) {
+          addActiveSlide(slideName);
+        }
+
+        currentSlideIndex = activeSlides.indexOf(slideName);
+        setSlide(currentSlideIndex);
+      }
+
+      goTo("start");
+
+      document.getElementById("start-button").addEventListener("click", () => {
+        document.getElementById("captcha-animation").pause();
+        goTo("instructions");
+        document.getElementById("next-button").addEventListener("click", () => {
+          goTo("detectingPulse");
+          setTimeout(() => {
+            doMeasuring();
+          }, (Math.random() * 3000) + 5000);
+        });
+      });
+
+      function doMeasuring() {
+        goTo("measuring");
+        
+        const bpmStat = document.getElementById("bpm-stat");
+        const bpmInfo = document.getElementById("bpm-info");
+        
+        let countdown = 5;
+
+        bpmStat.textContent = "Starting in 5";
+        bpmInfo.textContent = "Keep your mouse steady.";
+
+        const countdownInterval = setInterval(() => {
+          if (countdown > 0) {
+            countdown -= 1;
+            bpmStat.textContent = `Starting in ${countdown}`;
+          } else {
+            beginMeasurement();
+            clearInterval(countdownInterval);
+          }
+        }, 1000);
+      }
+
+      let lastX = null;
+      let lastY = null;
+      let distance = 0;
+      let total = 0;
+      let bpm = 0;
+      let failed = false;
+
+      function beginMeasurement() {
+        lastX = null;
+        lastY = null;
+        distance = 0;
+        total = 0;
+        bpm = 80;
+        failed = false;
+
+        let countdown = 30;
+
+        const bpmStat = document.getElementById("bpm-stat");
+        const bpmInfo = document.getElementById("bpm-info");
+
+        document.addEventListener("mousemove", onMouseMove);
+
+        const measurementInterval = setInterval(() => {
+          if (failed) {
+            document.removeEventListener("mousemove", onMouseMove);
+            clearInterval(measurementInterval);
+            doError();
+          }
+
+          bpm = Math.min(120, Math.max(60, bpm + distance + (Math.random() - 0.5) * 10));
+
+          if (countdown < 26 && total < 1) {
+            failed = true;
+          }
+
+          countdown--;
+
+          if (total > 0) {
+            bpmStat.textContent = `${Math.round(bpm)} BPM`;
+            bpmInfo.textContent = `Keep still. ${countdown} seconds remaining...`;
+          } else {
+            bpmStat.textContent = "0 BPM";
+            bpmInfo.textContent = "We can't detect your pulse. Try adjusting your wrist.";
+          }
+          
+          if (countdown < 1) {
+            document.removeEventListener("mousemove", onMouseMove);
+            clearInterval(measurementInterval);
+            captchaSuccess();
+          }
+        }, 1000);
+      }
+
+      function onMouseMove(e) {
+        if (lastX != null && lastY != null) {
+          const x = e.clientX - lastX;
+          const y = e.clientY - lastY;
+          distance = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+          total += distance;
+          
+          if (distance > difficulty) {
+            failed = true;
+          }
+        }
+
+        lastX = e.clientX;
+        lastY = e.clientY;
+      }
+
+      function doError() {
+        goTo("keepStill");
+        document.getElementById("retry-button").addEventListener("click", doMeasuring);
+      }
 
     })(window, document);
   </script>
